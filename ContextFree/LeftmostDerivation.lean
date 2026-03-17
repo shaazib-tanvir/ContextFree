@@ -24,7 +24,7 @@ lemma RewritesLeftmost.exists_parts
         grind
 
 lemma RewritesLeftmost.input_output
-  {r: ContextFreeRule T N} :
+  {r : ContextFreeRule T N} :
     r.RewritesLeftmost [Symbol.nonterminal r.input] r.output := by
     grind [RewritesLeftmost.head]
 
@@ -113,7 +113,7 @@ lemma ProducesLeftmost.nil_produces_of_nil
   (u : List (Symbol T g.NT))
   (h_produces : g.ProducesLeftmost [] u)
   : u = [] := by
-    grind only [eq_def, ContextFreeRule.RewritesLeftmost.nil_rewrites_of_nil, #753b]
+    grind only [eq_def, ContextFreeRule.RewritesLeftmost.nil_rewrites_of_nil]
 
 lemma ProducesLeftmost.cons
   (t : T)
@@ -163,13 +163,13 @@ lemma ProducesLeftmost.append_left
   (h_produces : g.ProducesLeftmost u v)
   : g.ProducesLeftmost
   (s.map Symbol.terminal ++ u) (s.map Symbol.terminal ++ v) := by
-    grind only [eq_def, ContextFreeRule.RewritesLeftmost.append_left, #6908, #2144]
+    grind only [eq_def, ContextFreeRule.RewritesLeftmost.append_left]
 
 lemma ProducesLeftmost.append_right
   (u v w : List (Symbol T g.NT))
   (h_produces : g.ProducesLeftmost u v)
   : g.ProducesLeftmost (u ++ w) (v ++ w) := by
-    grind only [eq_def, ContextFreeRule.RewritesLeftmost.append_right, #6908, #802c]
+    grind only [eq_def, ContextFreeRule.RewritesLeftmost.append_right]
 
 lemma DerivesLeftmost.append_left
   (s : List T)
@@ -270,8 +270,8 @@ lemma DerivesLeftmost.exists_parts_of_cons_derives
         · constructor
           · apply DerivesLeftmost.trans_produces
             · exact hxz
-            · grind only [ProducesLeftmost.eq_def,
-              ContextFreeRule.RewritesLeftmost.of_exists_parts, #0ce2]
+            ·  grind only [ProducesLeftmost.eq_def,
+              ContextFreeRule.RewritesLeftmost.of_exists_parts]
           · exact huw
       · rw [hq] at hw
         rw [←hp] at hb
