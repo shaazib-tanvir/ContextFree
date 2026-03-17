@@ -1,45 +1,5 @@
 import Mathlib.Computability.ContextFreeGrammar
 
-noncomputable def Or.elim_noncomputable
-  (h : h₁ ∨ h₂)
-  (f₁ : h₁ → α)
-  (f₂ : h₂ → α) : α :=
-  have h : ∃ a : α, ((x₁ : h₁) → a = f₁ x₁) ∧ ((x₂ : ¬h₁) → a = f₂ (by grind)) := by
-    by_cases h' : h₁
-    · use f₁ h'
-      grind
-    · use f₂ (by grind)
-      grind
-  h.choose
-
-theorem Or.elim_noncomputable_spec
-  (h : h₁ ∨ h₂)
-  (f₁ : h₁ → α)
-  (f₂ : h₂ → α)
-  :
-  ((x₁ : h₁) → Or.elim_noncomputable h f₁ f₂ = f₁ x₁) ∧
-  ((x₂ : ¬h₁) → Or.elim_noncomputable h f₁ f₂ = f₂ (by grind)) := by
-    grind [= elim_noncomputable]
-
-mutual
-def even : Nat → Bool
-  | 0 => true
-  | n + 1 => odd n
-
-def odd : Nat → Bool
-  | 0 => false
-  | n + 1 => even n
-end
-
-inductive ParseTree (g : ContextFreeGrammar T) (n : g.NT) where
-  | terminal
-  (children : List T)
-  (h_produces : g.Produces [.nonterminal n] <| children.map Symbol.terminal)
-  : ParseTree g n
-  | cons
-  (children : List (Symbol T g.NT))
-  : ParseTree g n
-
 /--/
 /- inductive Tree (g : ContextFreeGrammar T) where -/
 /-   | terminal : T → Tree g -/

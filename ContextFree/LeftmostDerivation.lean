@@ -148,6 +148,13 @@ lemma DerivesLeftmost.trans_produces
   : g.DerivesLeftmost u w := by
     solve_by_elim
 
+lemma DerivesLeftmost.produces_trans
+  (u v w : List (Symbol T g.NT))
+  (huv : g.ProducesLeftmost u v)
+  (hvw : g.DerivesLeftmost v w)
+  : g.DerivesLeftmost u w := by
+    exact Relation.ReflTransGen.head huv hvw
+
 lemma DerivesLeftmost.cons
   (t : T)
   (u v : List (Symbol T g.NT))
