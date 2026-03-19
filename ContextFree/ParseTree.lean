@@ -1,33 +1,10 @@
 import Mathlib.Computability.ContextFreeGrammar
+import Mathlib.Data.Nat.Init
 import ContextFree.LeftmostDerivation
+import ContextFree.Basic
 import LeanSearchClient
 
-namespace ContextFreeRule
-
-variable {r : ContextFreeRule T N}
-
-def StrictRewrites (n : N) (u : List (Symbol T N)) := r = ⟨ n, u ⟩
-
-lemma StrictRewrites.rewrites_leftmost (n : N) (u : List (Symbol T N))
-  (h : r.StrictRewrites n u)
-  : r.RewritesLeftmost [.nonterminal n] u := by
-    grind only [eq_def, RewritesLeftmost.iff_exists_parts, RewritesLeftmost.input_output]
-
-end ContextFreeRule
-
 namespace ContextFreeGrammar
-
-def StrictProduces (g : ContextFreeGrammar T) (n : g.NT) (u : List (Symbol T g.NT)) : Prop :=
-  ∃ r ∈ g.rules, r.StrictRewrites n u
-
-lemma StrictProduces.produces_leftmost
-  (g : ContextFreeGrammar T)
-  (n : g.NT)
-  (u : List (Symbol T g.NT))
-  (h : g.StrictProduces n u) : g.ProducesLeftmost [.nonterminal n] u := by
-    simp only [StrictProduces] at h
-    obtain ⟨ r, ⟨ hr, h_rewrite ⟩ ⟩ := h
-    use r; grind only [ContextFreeRule.StrictRewrites.rewrites_leftmost]
 
 /-!
 This definition is taken from the paper https://firsov.ee/cert-norm/cfg-norm.pdf
@@ -60,7 +37,93 @@ mutual
     (forest : Forest g roots s₂) : Forest g ((.nonterminal n) :: roots) (s₁ ++ s₂)
 end
 
-variable {g : ContextFreeGrammar T} {n : g.NT} {s : List T}
+mutual
+  def Tree.sizeOf
+  {g : ContextFreeGrammar T}
+  {n : g.NT}
+  {s : List T}
+  (tree : Tree g n s) : Nat :=
+    match tree with
+    | .node _ _ forest => 1 + forest.sizeOf
+
+  def Forest.sizeOf
+  {g : ContextFreeGrammar T}
+  {roots : List (Symbol T g.NT)}
+  {s : List T}
+  (forest : Forest g roots s) : Nat :=
+    match forest with
+    | .empty => 0
+    | .terminal _ forest' =>
+      1 + forest'.sizeOf
+    | .nonterminal _ tree forest' =>
+      1 + tree.sizeOf + forest'.sizeOf
+end
+
+def Forest.append
+  {g : ContextFreeGrammar T}
+  {roots₁ : List (Symbol T g.NT)}
+  {roots₂ : List (Symbol T g.NT)}
+  {s₁ s₂ : List T}
+  (f₁ : Forest g roots₁ s₁)
+  (f₂ : Forest g roots₂ s₂) : Forest g (roots₁ ++ roots₂) (s₁ ++ s₂) := by
+    cases f₁
+    case empty =>
+      exact f₂
+    case terminal roots s₁' t forest =>
+      let f := Forest.append forest f₂
+      apply Forest.terminal
+      exact f
+    case nonterminal roots xs ys n tree forest  =>
+      let f := Forest.append forest f₂
+      rw [List.append_assoc]
+      apply Forest.nonterminal
+      · exact tree
+      · exact f
+
+def Tree.toForest
+  {g : ContextFreeGrammar T}
+  {n : g.NT}
+  {s : List T}
+  (tree : Tree g n s) : Forest g [.nonterminal n] s := by
+    rw [←List.append_nil s]
+    apply Forest.nonterminal
+    · exact tree
+    · exact Forest.empty
+
+variable {g : ContextFreeGrammar T} {n : g.NT} {s : List T} {roots : List (Symbol T g.NT)}
+
+instance Tree.instSizeOf : SizeOf (Tree g n s) where
+  sizeOf := sizeOf
+
+instance Forest.instSizeOf : SizeOf (Forest g roots s) where
+  sizeOf := sizeOf
+
+lemma Tree.sizeOf_node_forest_lt_self
+  (children : List (Symbol T g.NT))
+  (h_produces : g.StrictProduces n children)
+  (forest : Forest g children s)
+  : SizeOf.sizeOf forest < SizeOf.sizeOf (Tree.node children h_produces forest) := by
+    reduce; grind
+
+lemma Forest.sizeOf_terminal_forest_lt_self
+  (t : T)
+  (forest : Forest g roots s)
+  : SizeOf.sizeOf forest < SizeOf.sizeOf (Forest.terminal t forest) := by
+    reduce; grind
+
+lemma Forest.sizeOf_nonterminal_tree_lt_self
+  (n : g.NT)
+  (tree : Tree g n s₁)
+  (forest : Forest g roots s₂)
+  : SizeOf.sizeOf tree < SizeOf.sizeOf (Forest.nonterminal n tree forest) := by
+    reduce; grind
+
+lemma Forest.sizeOf_nonterminal_forest_lt_self
+  (n : g.NT)
+  (tree : Tree g n s₁)
+  (forest : Forest g roots s₂)
+  : SizeOf.sizeOf forest < SizeOf.sizeOf (Forest.nonterminal n tree forest) := by
+    reduce; grind
 
 def Tree.children (tree : Tree g n s) : List (Symbol T g.NT) :=
   match tree with
@@ -78,9 +141,7 @@ def TreeForest.induction.{u} :=
     (fun {roots : List (Symbol T g.NT)} {s : List T} (t : g.Forest roots s) =>
       @Forest.rec T g motive1 motive2 node empty terminal nonterminal roots s t)
 
-private lemma tree_forest_derives_leftmost_leaves
-  {g : ContextFreeGrammar T}
-  :
+private lemma tree_forest_derives_leftmost_yield :
   (∀ n : g.NT, ∀ s : List T, ∀ _ : Tree g n s,
   g.DerivesLeftmost [.nonterminal n] <| s.map Symbol.terminal)
   ∧
@@ -101,20 +162,58 @@ private lemma tree_forest_derives_leftmost_leaves
       · exact h_roots
       · exact h_n 
 
-theorem Forest.derives_leftmost_leaves
-  {g : ContextFreeGrammar T}
-  {roots : List (Symbol T g.NT)}
-  {s : List T}
+theorem Forest.derives_leftmost_yield
   (forest : Forest g roots s)
   : g.DerivesLeftmost roots <| s.map Symbol.terminal := by
-    apply tree_forest_derives_leftmost_leaves.right roots s forest
+    apply tree_forest_derives_leftmost_yield.right roots s forest
 
-theorem Tree.derives_leftmost_leaves
-  {g : ContextFreeGrammar T}
-  {n : g.NT}
-  {s : List T}
+theorem Tree.derives_leftmost_yield
   (tree : Tree g n s)
   : g.DerivesLeftmost [.nonterminal n] <| s.map Symbol.terminal := by
-    apply tree_forest_derives_leftmost_leaves.left n s tree
+    apply tree_forest_derives_leftmost_yield.left n s tree
 
+def Forest.ofString
+  (s : List T) : Forest g (s.map Symbol.terminal) s :=
+  match s with
+  | [] => Forest.empty
+  | t :: ts =>
+    Forest.terminal t (Forest.ofString ts)
+
+theorem Tree.of_derivation
+  {g : ContextFreeGrammar T} {n : g.NT} {s : List T}
+  (h_derives : g.Derives [.nonterminal n] <| s.map Symbol.terminal)
+  : ∃ t : Tree g n s, True := by
+    generalize hn : [Symbol.nonterminal n] = ns at *
+    generalize hs : List.map Symbol.terminal s = s' at *
+    induction h_derives using Relation.ReflTransGen.head_induction_on with
+    | refl =>
+      sorry
+    | head =>
+      sorry
+
+-- I tried proving this a lot bot unfortunately proof irrelevance makes doing strong induction really hard and I'll have to reinvent Derives with Type instead of Prop to make this work which is a chore
+#check Relation.ReflTransGen.rec
+theorem Forest.of_derivation
+  {g : ContextFreeGrammar T} {roots : List (Symbol T g.NT)} {s : List T}
+  (h_derives : g.Derives roots <| s.map Symbol.terminal)
+  : ∃ f : Forest g roots s, True := by
+    sorry
+    /- generalize hs : List.map Symbol.terminal s = s' at * -/
+    /- rcases h_derives.cases_head -/
+    /- case inl => -/
+    /-   subst_eqs -/
+    /-   use Forest.ofString s -/
+    /- case inr h => -/
+    /-   obtain ⟨ u, h_u, h_us ⟩ := h -/
+    /-   subst_eqs -/
+    /-   change g.Derives u (List.map Symbol.terminal s) at h_us -/
+    /-   apply Produces.exists_parts at h_u -/
+    /-   obtain ⟨ r, hr, p, q, hroots, hu ⟩ := h_u; subst_eqs -/
+    /-   apply Derives.of_app_derives at h_us -/
+    /-   obtain ⟨ xs, ys, hxs, hys, hs ⟩ := h_us; subst_eqs -/
+    /-   apply Derives.of_app_derives at hxs -/
+    /-   obtain ⟨ zs, ws, hzs, hws, hxs ⟩ := hxs; subst_eqs -/
+    /-   have fp := Forest.of_derivation hys -/
+    /-   sorry -/
+    /--/
 end ContextFreeGrammar

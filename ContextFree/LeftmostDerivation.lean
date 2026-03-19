@@ -1,5 +1,6 @@
 import Mathlib.Computability.ContextFreeGrammar
 import LeanSearchClient
+import ContextFree.Basic
 
 namespace ContextFreeRule
 
@@ -94,6 +95,13 @@ lemma RewritesLeftmost.nil_rewrites_of_nil
       | x :: xs =>
         cases hr
 
+variable {r : ContextFreeRule T N}
+
+lemma StrictRewrites.rewrites_leftmost (n : N) (u : List (Symbol T N))
+  (h : r.StrictRewrites n u)
+  : r.RewritesLeftmost [.nonterminal n] u := by
+    grind only [eq_def, RewritesLeftmost.iff_exists_parts, RewritesLeftmost.input_output]
+
 end ContextFreeRule
 
 namespace ContextFreeGrammar
@@ -147,6 +155,13 @@ lemma DerivesLeftmost.trans_produces
   (hvw : g.ProducesLeftmost v w)
   : g.DerivesLeftmost u w := by
     solve_by_elim
+
+lemma DerivesLeftmost.produces_trans
+  (u v w : List (Symbol T g.NT))
+  (huv : g.ProducesLeftmost u v)
+  (hvw : g.DerivesLeftmost v w)
+  : g.DerivesLeftmost u w := by
+    exact Relation.ReflTransGen.head huv hvw
 
 lemma DerivesLeftmost.cons
   (t : T)
@@ -370,4 +385,14 @@ lemma DerivesLeftmost.append_left_of_derives_terminal
           apply DerivesLeftmost.append_left
           exact hi
 
+lemma StrictProduces.produces_leftmost
+  (g : ContextFreeGrammar T)
+  (n : g.NT)
+  (u : List (Symbol T g.NT))
+  (h : g.StrictProduces n u) : g.ProducesLeftmost [.nonterminal n] u := by
+    simp only [StrictProduces] at h
+    obtain ⟨ r, ⟨ hr, h_rewrite ⟩ ⟩ := h
+    use r; grind only [ContextFreeRule.StrictRewrites.rewrites_leftmost]
+
 end ContextFreeGrammar
+
