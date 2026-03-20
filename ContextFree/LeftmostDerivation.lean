@@ -329,6 +329,25 @@ lemma DerivesLeftmost.exists_parts_of_cons_derives
                 · rw [←hxs]; exact hw
                 · rw [hxs]
 
+lemma Produces.of_produces_leftmost
+  {u v : List (Symbol T g.NT)}
+  (h_produces_leftmost : g.ProducesLeftmost u v)
+  : g.Produces u v := by
+    rcases h_produces_leftmost with ⟨ r, hr, h_rewrites_leftmost ⟩
+    use r
+    constructor
+    · exact hr
+    · grind only [ContextFreeRule.Rewrites.of_rewrites_leftmost]
+
+lemma Derives.of_derives_leftmost
+  {u v : List (Symbol T g.NT)}
+  (h_derives_leftmost : g.DerivesLeftmost u v)
+  : g.Derives u v := by
+    induction h_derives_leftmost
+    case refl => grind
+    case tail h_derives_leftmost h_produces_leftmost h_derives =>
+      grind only [Relation.ReflTransGen.tail, Produces.of_produces_leftmost]
+
 lemma List.map_split_of_split
   {xs : List α}
   {ys zs : List β}

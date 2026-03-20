@@ -263,4 +263,23 @@ theorem Tree.of_derives
   : ∃ _ : Tree g n s, True := by
     use Tree.ofForest (Forest.of_derives h_derives).choose
 
+noncomputable def Tree.ofDerives
+  (h_derives : g.Derives [.nonterminal n] <| s.map Symbol.terminal) : Tree g n s :=
+  Tree.of_derives h_derives |>.choose
+
+noncomputable def Forest.ofDerives
+  (h_derives : g.Derives roots <| s.map Symbol.terminal) : Forest g roots s :=
+  Forest.of_derives h_derives |>.choose
+
+theorem derives_iff_leftmost_derives
+  {s : List T}
+  {u : List (Symbol T g.NT)}
+  : g.Derives u (s.map Symbol.terminal) ↔ g.DerivesLeftmost u (s.map Symbol.terminal) := by
+    constructor
+    · intro h_derives
+      have f := Forest.ofDerives h_derives
+      apply Forest.derives_leftmost_yield f
+    · intro h_derives_leftmost
+      exact Derives.of_derives_leftmost g h_derives_leftmost
+
 end ContextFreeGrammar
