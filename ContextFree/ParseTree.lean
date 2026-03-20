@@ -2,6 +2,7 @@ import Mathlib.Computability.ContextFreeGrammar
 import Mathlib.Data.Nat.Init
 import ContextFree.LeftmostDerivation
 import ContextFree.Basic
+import ContextFree.Derivation
 import LeanSearchClient
 
 namespace ContextFreeGrammar
@@ -89,6 +90,17 @@ def Tree.toForest
     apply Forest.nonterminal
     · exact tree
     · exact Forest.empty
+
+def Tree.ofForest
+  {g : ContextFreeGrammar T}
+  {n : g.NT}
+  {s : List T}
+  (forest : Forest g [.nonterminal n] s) : Tree g n s := by
+    rcases forest
+    expose_names
+    rcases forest
+    rw [List.append_nil]
+    exact tree
 
 variable {g : ContextFreeGrammar T} {n : g.NT} {s : List T} {roots : List (Symbol T g.NT)}
 
@@ -179,41 +191,76 @@ def Forest.ofString
   | t :: ts =>
     Forest.terminal t (Forest.ofString ts)
 
-theorem Tree.of_derivation
-  {g : ContextFreeGrammar T} {n : g.NT} {s : List T}
-  (h_derives : g.Derives [.nonterminal n] <| s.map Symbol.terminal)
-  : ∃ t : Tree g n s, True := by
-    generalize hn : [Symbol.nonterminal n] = ns at *
-    generalize hs : List.map Symbol.terminal s = s' at *
-    induction h_derives using Relation.ReflTransGen.head_induction_on with
-    | refl =>
-      sorry
-    | head =>
-      sorry
+lemma Forest.of_derives'
+  {g : ContextFreeGrammar T}
+  {roots : List (Symbol T g.NT)}
+  {s : List T}
+  (derives : g.Derives' roots <| s.map Symbol.terminal)
+  : ∃ _ : Forest g roots s, True := by
+    generalize h_size : derives.sizeOf = n
+    induction n using Nat.strong_induction_on generalizing derives roots s with
+    | h n hi =>
+      rcases h_derives : derives
+      case refl => use (by apply Forest.ofString s)
+      case trans u h_produces child_derives =>
+        obtain ⟨ r, hr, p, q, hp, hq ⟩ := Produces.exists_parts h_produces
+        have h_decreasing : child_derives.sizeOf < derives.sizeOf := by grind
+        revert h_produces child_derives
+        rw [hq]
+        intro h_produces child_derives h_derives h_decreasing
+        obtain ⟨ s', s₃, ⟨ derives', h' ⟩, ⟨ derives₃, h₃ ⟩, hs ⟩ :=
+          Derives'.of_append_derives' child_derives
+        obtain ⟨ s₁, s₂, ⟨ derives₁, h₁ ⟩, ⟨ derives₂, h₂ ⟩, hs' ⟩ :=
+          Derives'.of_append_derives' derives'
+        simp only [Derives'.sizeOf_def] at h₁ h₂ h₃ h'
+        have h_size₁ : derives₁.sizeOf < n := by
+          calc
+            derives₁.sizeOf ≤ derives'.sizeOf := by exact h₁
+            _ ≤ child_derives.sizeOf := by exact h'
+            _ < derives.sizeOf := by exact h_decreasing
+            _ = n := by rw [h_size]
+        have h_size₂ : derives₂.sizeOf < n := by
+          calc
+            derives₂.sizeOf ≤ derives'.sizeOf := by exact h₂
+            _ ≤ child_derives.sizeOf := by exact h'
+            _ < derives.sizeOf := by exact h_decreasing
+            _ = n := by rw [h_size]
+        have h_size₃ : derives₃.sizeOf < n := by
+          calc
+            _ ≤ child_derives.sizeOf := by exact h₃
+            _ < derives.sizeOf := by exact h_decreasing
+            _ = n := by rw [h_size]
+        have f₁ := hi derives₁.sizeOf h_size₁ derives₁ rfl |>.choose
+        have f₂ := hi derives₂.sizeOf h_size₂ derives₂ rfl |>.choose
+        have f₃ := hi derives₃.sizeOf h_size₃ derives₃ rfl |>.choose
+        have h_produces : g.StrictProduces r.input r.output := by
+          use r
+          constructor
+          · exact hr
+          · rfl
+        have tree := Tree.node r.output h_produces f₂
+        have f' := Forest.nonterminal r.input tree f₃
+        have f := Forest.append f₁ f'
+        use (by
+          subst_eqs
+          rw [List.append_assoc, List.append_assoc]
+          rw [@List.cons_append]
+          rw [List.nil_append]
+          exact f)
 
--- I tried proving this a lot bot unfortunately proof irrelevance makes doing strong induction really hard and I'll have to reinvent Derives with Type instead of Prop to make this work which is a chore
-#check Relation.ReflTransGen.rec
-theorem Forest.of_derivation
+theorem Forest.of_derives
   {g : ContextFreeGrammar T} {roots : List (Symbol T g.NT)} {s : List T}
   (h_derives : g.Derives roots <| s.map Symbol.terminal)
-  : ∃ f : Forest g roots s, True := by
-    sorry
-    /- generalize hs : List.map Symbol.terminal s = s' at * -/
-    /- rcases h_derives.cases_head -/
-    /- case inl => -/
-    /-   subst_eqs -/
-    /-   use Forest.ofString s -/
-    /- case inr h => -/
-    /-   obtain ⟨ u, h_u, h_us ⟩ := h -/
-    /-   subst_eqs -/
-    /-   change g.Derives u (List.map Symbol.terminal s) at h_us -/
-    /-   apply Produces.exists_parts at h_u -/
-    /-   obtain ⟨ r, hr, p, q, hroots, hu ⟩ := h_u; subst_eqs -/
-    /-   apply Derives.of_app_derives at h_us -/
-    /-   obtain ⟨ xs, ys, hxs, hys, hs ⟩ := h_us; subst_eqs -/
-    /-   apply Derives.of_app_derives at hxs -/
-    /-   obtain ⟨ zs, ws, hzs, hws, hxs ⟩ := hxs; subst_eqs -/
-    /-   have fp := Forest.of_derivation hys -/
-    /-   sorry -/
-    /--/
+  : ∃ _ : Forest g roots s, True := by
+    apply Derives'.of_derives at h_derives
+    obtain ⟨ derives, - ⟩ := h_derives
+    apply Forest.of_derives' at derives
+    exact derives
+
+theorem Tree.of_derives
+  {g : ContextFreeGrammar T} {n : g.NT} {s : List T}
+  (h_derives : g.Derives [.nonterminal n] <| s.map Symbol.terminal)
+  : ∃ _ : Tree g n s, True := by
+    use Tree.ofForest (Forest.of_derives h_derives).choose
+
 end ContextFreeGrammar
