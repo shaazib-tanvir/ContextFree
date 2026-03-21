@@ -15,12 +15,12 @@ inductive Derives' (g : ContextFreeGrammar T)
 variable {g : ContextFreeGrammar T}
 
 def Derives'.sizeOf
-  (derives' : Derives' g u v) : Nat :=
-  match derives' with
+  (derives : Derives' g u v) : Nat :=
+  match derives with
   | refl u =>
     u.length
-  | trans _ child_derives' =>
-    1 + child_derives'.sizeOf
+  | trans _ child_derives =>
+    1 + child_derives.sizeOf
 
 @[simp, grind =]
 lemma Derives'.sizeOf_refl_eq_length
